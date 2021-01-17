@@ -1,0 +1,117 @@
+#!perl
+
+# DATE
+# VERSION
+
+use 5.010001;
+use strict;
+use warnings;
+
+use Perinci::CmdLine::Any;
+
+our %SPEC;
+
+my $prefix = '/App/rimetadb/';
+
+Perinci::CmdLine::Any->new(
+    url => $prefix,
+    subcommands => {
+        'update-from-modules' => {url => "${prefix}update_from_modules"},
+        update    => {url => "${prefix}update"},
+        delete    => {url => "${prefix}delete"},
+        stats     => {url => "${prefix}stats"},
+        packages  => {url => "${prefix}packages"},
+        functions => {url => "${prefix}functions"},
+        'function-stats' => {url => "${prefix}function_stats"},
+        arguments => {url => "${prefix}arguments"},
+        'argument-stats' => {url => "${prefix}argument_stats"},
+        meta      => {url => "${prefix}meta"},
+    },
+    log => 1,
+)->run;
+
+# ABSTRACT:
+# PODNAME:
+
+=head1 SYNOPSIS
+
+Scan all local Perl modules in the C<MyCompany::> namespace, get all Rinci
+metadata and store them in the database (defaults to
+C<dbi:SQLite:dbname=$HOME/rimeta.db> where C<$HOME> is the user's home
+directory.
+
+ % rimetadb update-from-modules MyCompany::
+
+Ditto, except we specify custom database location (note that this is not
+recommended, you should put username/password in config file instead of
+command-line options):
+
+ % rimetadb update-from-modules MyCompany:: \
+     --dsn 'mysql:database=mycompany_rimeta' --user ... --password ...
+
+Update a single package metadata:
+
+ % rimetadb update --package MyCompany::Job \
+     --metadata-json '{"v":1.1,"summary":"Manage jobs"}'
+
+Update a single function metadata:
+
+ % rimetadb update --package MyCompany::Job --function restart_job \
+     --metadata-json '{"v":1.1,"summary":"Restart a job","args":{"id":{"summary":"Job ID","schema":"int*","req":1},"force":{"schema":"bool"}}}'
+
+Delete a single package metadata:
+
+ % rimetadb delete --package MyCompany::Job
+
+Delete a single function metadata:
+
+ % rimetadb delete --package MyCompany::Job --function restart_job
+
+Show some statistics (will be expanded further later):
+
+ % rimetadb stats
+
+List packages in the database:
+
+ % rimetadb packages
+ % rimetadb packages -l
+ % rimetadb packages MyCompany
+
+List functions in the database:
+
+ % rimetadb functions
+ % rimetadb functions -l
+ % rimetadb functions MyCompany
+
+List function arguments in the database:
+
+ % rimetadb arguments
+ % rimetadb arguments -l
+
+Get metadata of function/package:
+
+ % rimetadb meta Foo::Bar::func
+
+
+=head1 DESCRIPTION
+
+This script (and backend Perl module, L<App::rimetadb>) maintains a database
+that catalogs Rinci metadata. The metadata can be used for various purposes:
+
+=over
+
+=item * Statistics
+
+Average number of functions in a package. Average number of arguments in a
+function. Most often used schema data types for arguments. And so on.
+
+=item * Allow access to Perl functions via HTTP
+
+See L<Perinci::Access::HTTP::Server> and L<Riap>.
+
+=item * Documentation
+
+=back
+
+You can add Rinci metadata from installed Perl modules, or manually by
+specifying JSON or data structure via CLI or Perl API.
