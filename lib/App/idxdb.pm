@@ -30,13 +30,13 @@ sub _connect_db {
         # read-only mode
         die "Can't find index '$dbpath'\n" unless -f $dbpath;
     }
-    log_trace("Connecting to SQLite database at %s ...", $db_path);
+    log_trace("Connecting to SQLite database at %s ...", $dbpath);
     DBI->connect("dbi:SQLite:database=$dbpath", undef, undef,
                  {RaiseError=>1});
 }
 
 sub _init {
-    my ($args, $mode) = @;
+    my ($args, $mode) = @_;
 
     unless ($App::idxdb::state) {
         _set_args_default($args);
@@ -93,14 +93,19 @@ sub update {
     my $dbh = $state->{dbh};
     my $now = DateTime->now;
 
+  UPDATE_DAILY_TRADING_SUMMARY:
     {
         my $table_exists = DBIx::Util::Schema::table_exists($dbh, 'daily_trading_summary');
         my @table_fields;
+        if ($table_exists) {
+            @table_fields = map { $_->{COLUMN_NAME} } DBIx::Util::Schema::list_columns($dbh, 'daily_trading_summary');
+        }
         local $CWD = "$gd_path/table/idx_daily_trading_summary/raw";
       YEAR:
-        for $year (reverse glob("*")) {
+        for my $year (reverse glob("*")) {
+            local $CWD = $year;
           FILENAME:
-            for $filename (reverse glob("*.json.gz")) {
+            for my $filename (reverse glob("*.json.gz")) {
                 $filename =~ /^(\d{4})(\d{2})(\d{2})/ or die;
                 log_trace "Processing file $CWD/$filename ...";
                 my $date = "$1-$2-${3}";
@@ -108,7 +113,7 @@ sub update {
                     log_debug "Data for date $date already exist, skipping this date";
                     next FILENAME;
                 }
-                open my $fh, " gzip -d $filename |" or die "Can't open $filename: $!";
+                open my $fh, "gzip -cd $filename |" or die "Can't open $filename: $!";
                 my $data = JSON::MaybeXS::decode_json(join("", <$fh>));
                 if (ref $data eq 'HASH' && $data->{data}) {
                     $data = $data->{data};
@@ -128,6 +133,8 @@ sub update {
                         push @table_fields, $key;
                         push @field_defs, qq("$key" $type);
                     }
+                    push @table_fields, "ctime", "mtime";
+                    push @field_defs  , "ctime INT NOT NULL", "mtime INT NOT NULL";
                     $dbh->do("CREATE TABLE daily_trading_summary (".join(", ", @field_defs).")");
                     $dbh->do("CREATE INDEX ix_daily_trading_summary__StockCode ON daily_trading_summary(StockCode)");
                     $dbh->do("CREATE UNIQUE INDEX ix_daily_trading_summary__Date__StockCode ON daily_trading_summary(Date,StockCode)");
@@ -135,20 +142,25 @@ sub update {
 
                 my $sth_sel_stock = $dbh->prepare("SELECT code FROM stock WHERE code=?");
                 my $sth_ins_stock = $dbh->prepare("INSERT INTO stock (code,name,  ctime,mtime) VALUES (?,?,  ?,?)");
-                my $sth_ins_daily_trading_summary = $dbh->prepare("INSERT INTO daily_trading_summary (".join(",", map {qq("$_")} @table_fields).",  ctime,mtime) VALUES (".join(",", map {"?"} @table_fields)."  ?,?)");
+                my $sql = "INSERT INTO daily_trading_summary (".join(",", map {qq("$_")} @table_fields).") VALUES (".join(",", map {"?"} @table_fields).")";
+                #log_warn $sql;
+                my $sth_ins_daily_trading_summary = $dbh->prepare($sql);
                 $dbh->begin_work;
                 for my $row (@$data) {
                     $row->{Date} =~ s/T\d.+//;
                     $sth_sel_stock->execute($row->{StockCode});
                     my @row = $sth_sel_stock->fetchrow_array;
                     unless (@row) {
-                        $sth_ins_stock->($row->{StockCode}, $row->{StockName}, time(), time());
+                        $sth_ins_stock->execute($row->{StockCode}, $row->{StockName}, time(), time());
                     }
-                    $sth_ins_stock->execute((map { $row->{$_} } @table_fields), time(), time());
+                    $row->{ctime} = time();
+                    $row->{mtime} = time();
+                    $sth_ins_daily_trading_summary->execute((map { $row->{$_} } @table_fields));
                 }
                 $dbh->commit;
             }
         }
+    } # UPDATE_DAILY_TRADING_SUMMARY
 
     [200];
 }
@@ -159,6 +171,11 @@ sub update {
 =head1 SYNOPSIS
 
 See the included CLI script L<idxdb>.
+
+
+=head1 DESCRIPTION
+
+TBD
 
 
 =head1 SEE ALSO

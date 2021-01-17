@@ -1,0 +1,39 @@
+#!perl
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
+
+use 5.010001;
+use strict;
+use warnings;
+
+use Perinci::CmdLine::Any;
+
+our %SPEC;
+
+my $prefix = '/App/idxdb/';
+
+Perinci::CmdLine::Any->new(
+    url => $prefix,
+    subcommands => {
+        update    => {url => "${prefix}update"},
+    },
+    log => 1,
+)->run;
+
+# ABSTRACT:
+# PODNAME:
+
+=head1 SYNOPSIS
+
+Update data:
+
+ % idxdb update
+
+
+=head1 DESCRIPTION
+
+
+=head1 SEE ALSO
