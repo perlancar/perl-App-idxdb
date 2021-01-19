@@ -54,7 +54,7 @@ our %SPEC;
 
 $SPEC{':package'} = {
     v => 1.1,
-    summary => 'Import data from IDX and perform queries on them',
+    summary => 'Import data for stocks on the IDX (Indonesian Stock Exchange) and perform queries on them',
 };
 
 my %ownership_fields = (
