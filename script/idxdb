@@ -67,6 +67,8 @@ of some stock:
 
 =head1 DESCRIPTION
 
+B<NOTE: EARLY RELEASE, ONLY A FEW SUBCOMMANDS HAVE BEEN IMPLEMENTED.>
+
 This utility lets you load some data like IDX's daily trading summary (stock
 summary), list of stocks, and KSEI's monthly ownership into a SQLite database
 and perform some SQL queries against it.
