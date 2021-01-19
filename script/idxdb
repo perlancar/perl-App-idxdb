@@ -18,7 +18,11 @@ my $prefix = '/App/idxdb/';
 Perinci::CmdLine::Any->new(
     url => $prefix,
     subcommands => {
-        update    => {url => "${prefix}update"},
+        'update'          => {url => "${prefix}update"},
+        'table-ownership' => {url => "${prefix}table_ownership"},
+        #'graph-ownership' => {url => "${prefix}graph_ownership"},
+        #'graph-trade'     => {url => "${prefix}graph_trade"},
+        #'graph-cummtrade' => {url => "${prefix}graph_cummtrade"},
     },
     log => 1,
 )->run;
@@ -28,9 +32,26 @@ Perinci::CmdLine::Any->new(
 
 =head1 SYNOPSIS
 
-Update data:
+To update data:
 
  % idxdb update
+
+To see a table of ownership (% foreign/local) of some stock through time:
+
+ % idxdb table-ownership BBRI
+ % idxdb table-ownership TLKM EXCL
+
+To graph ownership (% foreign/local) of some stock:
+
+ % idxdb graph-ownership BBRI
+
+To graph foreign net buy/sell of some stock:
+
+ % idxdb graph-trade BBRI
+
+To graph cummulative foreign net buy/sell of some stock:
+
+ % idxdb graph-cummtrade BBRI
 
 
 =head1 DESCRIPTION

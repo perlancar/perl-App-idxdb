@@ -28,7 +28,8 @@ sub _connect_db {
     if ($mode eq 'ro') {
         # avoid creating the database file automatically if we are only in
         # read-only mode
-        die "Can't find index '$dbpath'\n" unless -f $dbpath;
+        die "Can't find index '$dbpath', check that path is correct. ".
+            "Or maybe you should run the 'update' subcommand first to create the database.\n" unless -f $dbpath;
     }
     log_trace("Connecting to SQLite database at %s ...", $dbpath);
     DBI->connect("dbi:SQLite:database=$dbpath", undef, undef,
@@ -53,7 +54,7 @@ our %SPEC;
 
 $SPEC{':package'} = {
     v => 1.1,
-    summary => 'IDX database',
+    summary => 'Import data from IDX and perform queries on them',
 };
 
 our %args_common = (
@@ -69,9 +70,27 @@ _
     },
 );
 
+our %arg0_stocks = (
+    stocks => {
+        'x.name.is_plural' => 1,
+        'x.name.singular' => 'stock',
+        schema => ['array*', of=>'idx::listed_stock_code*'], # XXX allow unlisted ones too in the future
+        req => 1,
+        pos => 0,
+        slurpy => 1,
+    },
+);
+
 $SPEC{update} = {
     v => 1.1,
     summary => 'Update data',
+    description => <<'_',
+
+Currently this routine imports from text files in the `gudangdata` repository on
+the local filesystem. Functionality to import from server directly using
+<pm:Finance::SE::IDX> and <pm:Finance::ID::KSEI> will be added in the future.
+
+_
     args => {
         %args_common,
         gudangdata_path => {
@@ -93,8 +112,48 @@ sub update {
     my $dbh = $state->{dbh};
     my $now = DateTime->now;
 
+  UPDATE_META:
+    {
+        my $table_exists = DBIx::Util::Schema::table_exists($dbh, 'meta');
+        last if $table_exists;
+        $dbh->do("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT)");
+    }
+
+    my $sth_sel_meta = $dbh->prepare("SELECT value FROM meta WHERE name=?");
+    my $sth_upd_meta = $dbh->prepare("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)");
+
+  UPDATE_STOCK:
+    {
+        local $CWD = "$gd_path/table/idx_stock";
+        my @st = stat "data.tsv" or die "Can't stat $CWD/data.tsv: $!";
+        open my $fh, "<", "data.tsv" or die "Can't open $CWD/data.tsv: $!";
+
+        # for simplicity, we replce whole table when updating data
+        my $table_exists = DBIx::Util::Schema::table_exists($dbh, 'stock');
+        if (!$table_exists) {
+            log_info "Creating table 'stock' ...";
+            $dbh->do("CREATE TABLE stock (code VARCHAR(4) PRIMARY KEY, sector TEXT NOT NULL, name TEXT NOT NULL, listing_date TEXT NOT NULL, shares DECIMAL NOT NULL, board TEXT NOT NULL)");
+        }
+        $sth_sel_meta->execute("stock_table_mtime");
+        my ($stock_table_mtime) = $sth_sel_meta->fetchrow_array;
+        if (!$stock_table_mtime || $stock_table_mtime < $st[9]) {
+            my $sth_ins_stock = $dbh->prepare("INSERT INTO stock (code,sector,name,listing_date,shares,board) VALUES (?,?,?,?,?,?)");
+            log_info "Updating table 'stock' ...";
+            $dbh->begin_work;
+            $dbh->do("DELETE FROM stock");
+            <$fh>;
+            while (my $line = <$fh>) {
+                chomp $line;
+                $sth_ins_stock->execute(split /\t/, $line);
+            }
+            $sth_upd_meta->execute("stock_table_mtime", time());
+            $dbh->commit;
+        }
+    }
+
   UPDATE_DAILY_TRADING_SUMMARY:
     {
+        log_info "Updating daily trading summary ...";
         my $table_exists = DBIx::Util::Schema::table_exists($dbh, 'daily_trading_summary');
         my @table_fields;
         if ($table_exists) {
@@ -115,15 +174,9 @@ sub update {
                 }
                 open my $fh, "gzip -cd $filename |" or die "Can't open $filename: $!";
                 my $data = JSON::MaybeXS::decode_json(join("", <$fh>));
-                if (ref $data eq 'HASH' && $data->{data}) {
-                    $data = $data->{data};
-                }
-                unless (@$data) {
-                    log_debug "File $filename does not contain any records, skipping";
-                    next FILENAME;
-                }
+                $data = $data->[2]; $data = [] if ref $data ne 'ARRAY';
                 unless ($table_exists) {
-                    $dbh->do("CREATE TABLE stock (code TEXT PRIMARY KEY, name TEXT NOT NULL, ctime INT NOT NULL, mtime INT NOT NULL)");
+                    log_info "Creating table 'daily_trading_summary' ...";
                     my @field_defs;
                     for my $key (sort keys %{ $data->[0] }) {
                         next if $key =~ /^(No|StockName)$/;
@@ -141,19 +194,12 @@ sub update {
                     $table_exists++;
                 }
 
-                my $sth_sel_stock = $dbh->prepare("SELECT code FROM stock WHERE code=?");
-                my $sth_ins_stock = $dbh->prepare("INSERT INTO stock (code,name,  ctime,mtime) VALUES (?,?,  ?,?)");
                 my $sql = "INSERT INTO daily_trading_summary (".join(",", map {qq("$_")} @table_fields).") VALUES (".join(",", map {"?"} @table_fields).")";
                 #log_warn $sql;
                 my $sth_ins_daily_trading_summary = $dbh->prepare($sql);
                 $dbh->begin_work;
                 for my $row (@$data) {
                     $row->{Date} =~ s/T\d.+//;
-                    $sth_sel_stock->execute($row->{StockCode});
-                    my @row = $sth_sel_stock->fetchrow_array;
-                    unless (@row) {
-                        $sth_ins_stock->execute($row->{StockCode}, $row->{StockName}, time(), time());
-                    }
                     $row->{ctime} = time();
                     $row->{mtime} = time();
                     $sth_ins_daily_trading_summary->execute((map { $row->{$_} } @table_fields));
@@ -165,6 +211,7 @@ sub update {
 
   UPDATE_OWNERSHIP:
     {
+        log_info "Updating stock ownership ...";
         my $table_exists = DBIx::Util::Schema::table_exists($dbh, 'stock_ownership');
         my @table_fields;
         if ($table_exists) {
@@ -252,6 +299,22 @@ sub update {
     [200];
 }
 
+$SPEC{table_ownership} = {
+    v => 1.1,
+    summary => 'Show ownership of some stock through time',
+    args => {
+        %arg0_stocks,
+    },
+};
+sub table_ownership {
+    my %args = @_;
+
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
+    [200];
+}
+
 1;
 # ABSTRACT:
 
@@ -262,7 +325,6 @@ See the included CLI script L<idxdb>.
 
 =head1 DESCRIPTION
 
-TBD
 
 
 =head1 SEE ALSO
