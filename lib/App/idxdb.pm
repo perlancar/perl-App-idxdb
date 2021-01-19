@@ -57,6 +57,31 @@ $SPEC{':package'} = {
     summary => 'Import data from IDX and perform queries on them',
 };
 
+my %ownership_fields = (
+    LocalIS => 'Local insurance',
+    LocalCP => 'Local corporate',
+    LocalPF => 'Local pension fund',
+    LocalIB => 'Local bank',
+    LocalID => 'Local individual',
+    LocalMF => 'Local mutual fund',
+    LocalSC => 'Local securities',
+    LocalFD => 'Local foundation',
+    LocalOT => 'Local other',
+    LocalTotal => 'Local total',
+
+    ForeignIS => 'Foreign insurance',
+    ForeignCP => 'Foreign corporate',
+    ForeignPF => 'Foreign pension fund',
+    ForeignIB => 'Foreign bank',
+    ForeignID => 'Foreign individual',
+    ForeignMF => 'Foreign mutual fund',
+    ForeignSC => 'Foreign securities',
+    ForeignFD => 'Foreign foundation',
+    ForeignOT => 'Foreign other',
+    ForeignTotal => 'Foreign total',
+);
+my @ownership_fields = sort keys %ownership_fields;
+
 our %args_common = (
     dbpath => {
         summary => 'Path for SQLite database',
@@ -70,6 +95,14 @@ _
     },
 );
 
+our %arg0_stock = (
+    stock => {
+        schema => 'idx::listed_stock_code*', # XXX allow unlisted ones too in the future
+        req => 1,
+        pos => 0,
+    },
+);
+
 our %arg0_stocks = (
     stocks => {
         'x.name.is_plural' => 1,
@@ -78,6 +111,32 @@ our %arg0_stocks = (
         req => 1,
         pos => 0,
         slurpy => 1,
+    },
+);
+
+our %argsopt_filter_date = (
+    date_start => {
+        schema => ['date*', 'x.perl.coerce_to' => 'DateTime'],
+        tags => ['category:filtering'],
+    },
+    date_end => {
+        schema => ['date*', 'x.perl.coerce_to' => 'DateTime'],
+        tags => ['category:filtering'],
+    },
+);
+
+our %argopt_fields_ownership = (
+    fields => {
+        'x.name.is_plural' => 1,
+        'x.name.singular' => 'field',
+        schema => ['array*', of=>['str*'=>{in=>\@ownership_fields, 'x.in.summaries'=>[map {$ownership_fields{$_}} @ownership_fields]}]],
+        tags => ['category:field_selection'],
+        default => ['LocalTotal', 'ForeignTotal'],
+        cmdline_aliases => {
+            fields_all     => {is_flag=>1, code=>sub { $_[0]{fields} = \@ownership_fields }},
+            fields_foreign => {is_flag=>1, code=>sub { $_[0]{fields} = [grep {/Foreign/} @ownership_fields] }},
+            fields_local   => {is_flag=>1, code=>sub { $_[0]{fields} = [grep {/Local/} @ownership_fields] }},
+        },
     },
 );
 
@@ -303,16 +362,48 @@ $SPEC{table_ownership} = {
     v => 1.1,
     summary => 'Show ownership of some stock through time',
     args => {
-        %arg0_stocks,
+        %arg0_stock,
+        %argsopt_filter_date,
+        %argopt_fields_ownership,
     },
 };
 sub table_ownership {
     my %args = @_;
+    my $stock = $args{stock};
+    my $fields = $args{fields};
 
     my $state = _init(\%args, 'ro');
     my $dbh = $state->{dbh};
 
-    [200];
+    my @wheres;
+    my @binds;
+    push @wheres, "Code=?";
+    push @binds, $stock;
+    if ($args{date_start}) {
+        push @wheres, "date >= '".$args{date_start}->ymd."'";
+    }
+    if ($args{date_end}) {
+        push @wheres, "date <= '".$args{date_end}->ymd."'";
+    }
+
+    my $sth = $dbh->prepare("SELECT * FROM stock_ownership WHERE ".join(" AND ", @wheres)." ORDER BY date");
+    $sth->execute(@binds);
+    my @rows;
+
+    while (my $row = $sth->fetchrow_hashref) {
+        delete $row->{Code};
+        delete $row->{Price};
+        delete $row->{ctime};
+        delete $row->{mtime};
+        my $total = $row->{LocalTotal} + $row->{ForeignTotal};
+        for (@ownership_fields) {
+            $row->{$_} = sprintf "%5.2f%%", $row->{$_}/$total*100;
+        }
+        for my $f (@ownership_fields) { delete $row->{$f} unless (grep {$_ eq $f} @$fields) }
+        push @rows, $row;
+    }
+
+    [200, "OK", \@rows, {'table.fields'=>['date']}];
 }
 
 1;
