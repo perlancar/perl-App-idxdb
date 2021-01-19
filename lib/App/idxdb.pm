@@ -107,7 +107,7 @@ our %arg0_stocks = (
     stocks => {
         'x.name.is_plural' => 1,
         'x.name.singular' => 'stock',
-        schema => ['array*', of=>'idx::listed_stock_code*'], # XXX allow unlisted ones too in the future
+        schema => ['array*', of=>'idx::listed_stock_code*', min_len=>1], # XXX allow unlisted ones too in the future
         req => 1,
         pos => 0,
         slurpy => 1,
@@ -125,11 +125,21 @@ our %argsopt_filter_date = (
     },
 );
 
+my $sch_ownership_field = ['str*'=>{in=>\@ownership_fields, 'x.in.summaries'=>[map {$ownership_fields{$_}} @ownership_fields]}];
+
+our %argopt_field_ownership = (
+    field => {
+        schema => $sch_ownership_field,
+        tags => ['category:field_selection'],
+        default => 'ForeignTotal',
+    },
+);
+
 our %argopt_fields_ownership = (
     fields => {
         'x.name.is_plural' => 1,
         'x.name.singular' => 'field',
-        schema => ['array*', of=>['str*'=>{in=>\@ownership_fields, 'x.in.summaries'=>[map {$ownership_fields{$_}} @ownership_fields]}]],
+        schema => ['array*', of=>$sch_ownership_field],
         tags => ['category:field_selection'],
         default => ['LocalTotal', 'ForeignTotal'],
         cmdline_aliases => {
@@ -404,6 +414,212 @@ sub table_ownership {
     }
 
     [200, "OK", \@rows, {'table.fields'=>['date']}];
+}
+
+$SPEC{graph_ownership} = {
+    v => 1.1,
+    summary => 'Show ownership of some stock(s) through time',
+    args => {
+        %arg0_stocks,
+        %argsopt_filter_date,
+        %argopt_field_ownership,
+    },
+};
+sub graph_ownership {
+    require Chart::Gnuplot;
+    require Color::RGB::Util;
+    require File::Temp;
+
+    my %args = @_;
+    my $stocks = $args{stocks};
+    my $field = $args{field};
+
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
+    my @wheres;
+    my @binds;
+    push @wheres, "Code IN (".join(",", map {$dbh->quote($_)} @$stocks).")";
+    if ($args{date_start}) {
+        push @wheres, "date >= '".$args{date_start}->ymd."'";
+    }
+    if ($args{date_end}) {
+        push @wheres, "date <= '".$args{date_end}->ymd."'";
+    }
+
+    my @dates;
+    my %stock_ownerships; # key=stock code, value=[y1, y2, ...]
+
+    my $sth = $dbh->prepare("SELECT * FROM stock_ownership WHERE ".join(" AND ", @wheres)." ORDER BY date");
+    $sth->execute(@binds);
+    my ($mindate, $maxdate);
+    while (my $row = $sth->fetchrow_hashref) {
+        #$mindate = $row->{date} if !$mindate || $mindate gt $row->{date};
+        #$maxdate = $row->{date} if !$maxdate || $maxdate lt $row->{date};
+        # since date is sorted, we can do this instead:
+        $mindate //= $row->{date};
+        $maxdate = $row->{date};
+        push @dates, $row->{date} if !@dates || $dates[-1] ne $row->{date};
+        $stock_ownerships{$row->{Code}} //= [];
+        push @{ $stock_ownerships{$row->{Code}} }, $row->{$field} / ($row->{LocalTotal}+$row->{ForeignTotal}) * 100;
+    }
+
+    my ($tempfh, $tempfilename) = File::Temp::tempfile();
+    $tempfilename .= ".png";
+  DRAW_CHART: {
+        my @datasets;
+
+        my $chart = Chart::Gnuplot->new(
+            output   => $tempfilename,
+            title    => "Stock $field ownership (".join(",", @$stocks).") from $mindate to $maxdate",
+            xlabel   => 'date',
+            ylabel   => "\%$field",
+            timeaxis => 'x',
+            xtics    => {labelfmt=>'%Y-%m-%d'},
+            #yrange   => [0, 100],
+        );
+        for my $stock (@$stocks) {
+            push @datasets, Chart::Gnuplot::DataSet->new(
+                xdata   => \@dates,
+                ydata   => $stock_ownerships{$stock},
+                timefmt => '%Y-%m-%d',
+                title   => $stock,
+                color   => "#".Color::RGB::Util::assign_rgb_dark_color($stock),
+                style   => 'lines',
+            );
+        }
+        $chart->plot2d(@datasets);
+    }
+
+    require Browser::Open;
+    Browser::Open::open_browser("file:$tempfilename");
+
+    [200];
+}
+
+$SPEC{graph_ownership_composition} = {
+    v => 1.1,
+    summary => 'Show ownership composition of some stock through time',
+    args => {
+        %arg0_stock,
+        %argsopt_filter_date,
+        subset => {
+            schema => ['str*', in=>[qw/all local foreign/]],
+            default => 'foreign',
+        },
+    },
+};
+sub graph_ownership_composition {
+    require Chart::Gnuplot;
+    require Color::RGB::Util;
+    require File::Temp;
+
+    my %args = @_;
+    my $stock = $args{stock};
+    my $subset = $args{subset} // 'foreign';
+
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
+    my @fields;
+    if ($subset eq 'foreign')  { @fields = grep { /Foreign/ && !/Total/ } @ownership_fields }
+    elsif ($subset eq 'local') { @fields = grep { /Local/   && !/Total/ } @ownership_fields }
+    else { @fields = @ownership_fields }
+
+    my @wheres;
+    my @binds;
+    push @wheres, "Code=?";
+    push @binds, $stock;
+    if ($args{date_start}) {
+        push @wheres, "date >= '".$args{date_start}->ymd."'";
+    }
+    if ($args{date_end}) {
+        push @wheres, "date <= '".$args{date_end}->ymd."'";
+    }
+
+    my @dates;
+    my %stock_ownerships; # key=ForeignIB, ..., value=[y1, y2, ...]
+
+    my $sth = $dbh->prepare("SELECT * FROM stock_ownership WHERE ".join(" AND ", @wheres)." ORDER BY date");
+    $sth->execute(@binds);
+    my ($mindate, $maxdate);
+    while (my $row = $sth->fetchrow_hashref) {
+        #$mindate = $row->{date} if !$mindate || $mindate gt $row->{date};
+        #$maxdate = $row->{date} if !$maxdate || $maxdate lt $row->{date};
+        # since date is sorted, we can do this instead:
+        $mindate //= $row->{date};
+        $maxdate = $row->{date};
+        push @dates, $row->{date} if !@dates || $dates[-1] ne $row->{date};
+        for (@fields) {
+            push @{ $stock_ownerships{$_} }, $row->{$_} / ($row->{LocalTotal}+$row->{ForeignTotal}) * 100;
+        }
+    }
+
+    my ($tempfh, $tempfilename) = File::Temp::tempfile();
+    $tempfilename .= ".png";
+  DRAW_CHART: {
+        my @datasets;
+
+        my $chart = Chart::Gnuplot->new(
+            output   => $tempfilename,
+            title    => "Stock ownership composition of $stock from $mindate to $maxdate",
+            xlabel   => 'date',
+            ylabel   => "\%",
+            timeaxis => 'x',
+            xtics    => {labelfmt=>'%Y-%m-%d'},
+            #yrange   => [0, 100],
+        );
+        my $i = -1;
+
+        # ugh, the colors are horrible
+        #srand(2);
+        #my @colors = Color::RGB::Util::rand_rgb_colors({light_color=>undef, hash_prefix=>1}, @fields+0);
+
+        # using http://phrogz.net/css/distinct-colors.html. ugh, not much
+        # better.
+        #my @colors = (
+        #    '#ff0000',
+        #    '#e50000',
+        #    '#590000',
+        #    '#8c6969',
+        #    '#332626',
+        #    '#994526',
+        #    '#f2c6b6',
+        #    '#ff8c40',
+        #    '#4c2900',
+        #    '#b28959',
+        #);
+
+        #  manual is best
+        my @colors = qw(
+                           blue
+                           green
+                           red
+                           orange
+                           black
+                           magenta
+                           yellow
+                           gray
+                   );
+
+        for my $field (@fields) {
+            $i++;
+            push @datasets, Chart::Gnuplot::DataSet->new(
+                xdata   => \@dates,
+                ydata   => $stock_ownerships{$field},
+                timefmt => '%Y-%m-%d',
+                title   => $field,
+                color   => $colors[$i],
+                style   => 'lines',
+            );
+        }
+        $chart->plot2d(@datasets);
+    }
+
+    require Browser::Open;
+    Browser::Open::open_browser("file:$tempfilename");
+
+    [200];
 }
 
 1;

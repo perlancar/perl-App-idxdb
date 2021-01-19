@@ -20,7 +20,8 @@ Perinci::CmdLine::Any->new(
     subcommands => {
         'update'          => {url => "${prefix}update"},
         'table-ownership' => {url => "${prefix}table_ownership"},
-        #'graph-ownership' => {url => "${prefix}graph_ownership"},
+        'graph-ownership' => {url => "${prefix}graph_ownership"},
+        'graph-ownership-composition' => {url => "${prefix}graph_ownership_composition"},
         #'graph-trade'     => {url => "${prefix}graph_trade"},
         #'graph-cummtrade' => {url => "${prefix}graph_cummtrade"},
     },
@@ -39,22 +40,37 @@ To update data:
 To see a table of ownership (% foreign/local) of some stock through time:
 
  % idxdb table-ownership BBRI
- % idxdb table-ownership TLKM EXCL
+ % idxdb table-ownership BBRI --fields-all
 
-To graph ownership (% foreign/local) of some stock:
+To graph ownership (by default foreign) of some stock:
 
  % idxdb graph-ownership BBRI
 
-To graph foreign net buy/sell of some stock:
+To graph ownership composition (% foreign bank, foreign total, local bank, etc)
+of some stock:
+
+ % idxdb graph-ownership-composition BBRI
+
+(NOT YET IMPLEMENTED) To graph foreign net buy/sell of some stock:
 
  % idxdb graph-trade BBRI
 
-To graph cummulative foreign net buy/sell of some stock:
+(NOT YET IMPLEMENTED) To graph cummulative foreign net buy/sell of some stock:
 
  % idxdb graph-cummtrade BBRI
 
 
 =head1 DESCRIPTION
 
+This utility lets you load some data like IDX's daily trading summary (stock
+summary), list of stocks, and KSEI's monthly ownership into a SQLite database
+and perform some SQL queries against it.
+
+Keywords: stock trading, Indonesian Stock Exchange, securities analysis.
+
 
 =head1 SEE ALSO
+
+L<Finance::SE::IDX>
+
+L<Finance::ID::KSEI>
