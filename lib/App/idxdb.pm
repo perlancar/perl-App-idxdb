@@ -622,6 +622,16 @@ sub graph_ownership_composition {
     [200];
 }
 
+$SPEC{legend_ownership} = {
+    v => 1.1,
+    summary => 'Show ownership legend (e.g. ForeignIB = foreign bank)',
+    args => {
+    },
+};
+sub legend_ownership {
+    [200, "OK", \%ownership_fields];
+}
+
 1;
 # ABSTRACT:
 
