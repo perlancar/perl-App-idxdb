@@ -116,11 +116,11 @@ our %arg0_stocks = (
 
 our %argsopt_filter_date = (
     date_start => {
-        schema => ['date*', 'x.perl.coerce_to' => 'DateTime'],
+        schema => ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural']],
         tags => ['category:filtering'],
     },
     date_end => {
-        schema => ['date*', 'x.perl.coerce_to' => 'DateTime'],
+        schema => ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural']],
         tags => ['category:filtering'],
     },
 );
