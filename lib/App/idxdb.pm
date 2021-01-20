@@ -185,6 +185,7 @@ sub update {
     {
         my $table_exists = DBIx::Util::Schema::table_exists($dbh, 'meta');
         last if $table_exists;
+        log_info "Creating meta table ...";
         $dbh->do("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT)");
     }
 
@@ -222,7 +223,7 @@ sub update {
 
   UPDATE_DAILY_TRADING_SUMMARY:
     {
-        log_info "Updating daily trading summary ...";
+        log_trace "Updating daily trading summary ...";
         my $table_exists = DBIx::Util::Schema::table_exists($dbh, 'daily_trading_summary');
         my @table_fields;
         if ($table_exists) {
@@ -238,7 +239,7 @@ sub update {
                 log_trace "Processing file $CWD/$filename ...";
                 my $date = "$1-$2-${3}";
                 if ($table_exists && $dbh->selectrow_array(q(SELECT 1 FROM daily_trading_summary WHERE "Date" = ?), {}, $date)) {
-                    log_debug "Data for date $date already exist, skipping this date";
+                    log_trace "Data for date $date already exist, skipping this date";
                     next FILENAME;
                 }
                 open my $fh, "gzip -cd $filename |" or die "Can't open $filename: $!";
@@ -262,7 +263,7 @@ sub update {
                     $dbh->do("CREATE UNIQUE INDEX ix_daily_trading_summary__Date__StockCode ON daily_trading_summary(Date,StockCode)");
                     $table_exists++;
                 }
-
+                log_info "Inserting daily trading summary for $date ..." if @$data;
                 my $sql = "INSERT INTO daily_trading_summary (".join(",", map {qq("$_")} @table_fields).") VALUES (".join(",", map {"?"} @table_fields).")";
                 #log_warn $sql;
                 my $sth_ins_daily_trading_summary = $dbh->prepare($sql);
@@ -280,7 +281,7 @@ sub update {
 
   UPDATE_OWNERSHIP:
     {
-        log_info "Updating stock ownership ...";
+        log_trace "Updating stock ownership ...";
         my $table_exists = DBIx::Util::Schema::table_exists($dbh, 'stock_ownership');
         my @table_fields;
         if ($table_exists) {
@@ -324,6 +325,7 @@ sub update {
                 }
 
                 unless ($table_exists) {
+                    log_info "Creating table 'stock_ownership' ...";
                     my @table_field_defs;
                     push @table_fields    , "date";
                     push @table_field_defs, "date TEXT NOT NULL";
@@ -345,6 +347,7 @@ sub update {
                     $table_exists++;
                 }
 
+                log_info "Inserting stock ownership data for $date ...";
                 my $sql = "INSERT INTO stock_ownership (".join(",", map {qq("$_")} @table_fields).") VALUES (".join(",", map {"?"} @table_fields).")";
                 #log_warn $sql;
                 my $sth_ins_stock_ownership = $dbh->prepare($sql);
