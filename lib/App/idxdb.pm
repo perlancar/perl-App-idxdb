@@ -512,6 +512,7 @@ $SPEC{graph_ownership_composition} = {
 sub graph_ownership_composition {
     require Chart::Gnuplot;
     require Color::RGB::Util;
+    require ColorTheme::Distinct::WhiteBG;
     require File::Temp;
 
     my %args = @_;
@@ -571,36 +572,8 @@ sub graph_ownership_composition {
         );
         my $i = -1;
 
-        # ugh, the colors are horrible
-        #srand(2);
-        #my @colors = Color::RGB::Util::rand_rgb_colors({light_color=>undef, hash_prefix=>1}, @fields+0);
-
-        # using http://phrogz.net/css/distinct-colors.html. ugh, not much
-        # better.
-        #my @colors = (
-        #    '#ff0000',
-        #    '#e50000',
-        #    '#590000',
-        #    '#8c6969',
-        #    '#332626',
-        #    '#994526',
-        #    '#f2c6b6',
-        #    '#ff8c40',
-        #    '#4c2900',
-        #    '#b28959',
-        #);
-
-        #  manual is best
-        my @colors = qw(
-                           blue
-                           green
-                           red
-                           orange
-                           black
-                           magenta
-                           yellow
-                           gray
-                   );
+        my $theme = ColorTheme::Distinct::WhiteBG->new;
+        my @colors = map { '#'.$theme->get_item_color($_) } ($theme->list_items);
 
         for my $field (@fields) {
             $i++;
