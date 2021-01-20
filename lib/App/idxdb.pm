@@ -600,6 +600,12 @@ $SPEC{legend_ownership} = {
     summary => 'Show ownership legend (e.g. ForeignIB = foreign bank)',
     args => {
     },
+    examples => [
+        {
+            args=>{},
+            test=>0,
+        },
+    ],
 };
 sub legend_ownership {
     [200, "OK", \%ownership_fields];
