@@ -478,7 +478,7 @@ sub graph_ownership {
             xlabel   => 'date',
             ylabel   => "\%$field",
             timeaxis => 'x',
-            xtics    => {labelfmt=>'%Y-%m-%d', rotate=>-90},
+            xtics    => {labelfmt=>'%Y-%m-%d', rotate=>"30 right"},
             #yrange   => [0, 100],
         );
         for my $stock (@$stocks) {
@@ -570,7 +570,8 @@ sub graph_ownership_composition {
             xlabel   => 'date',
             ylabel   => "\%",
             timeaxis => 'x',
-            xtics    => {labelfmt=>'%Y-%m-%d', rotate=>-90},
+            xtics    => {labelfmt=>'%Y-%m-%d', rotate=>"30 right",
+                     },
             #yrange   => [0, 100],
         );
         my $i = -1;
