@@ -1,3 +1,24 @@
+0.003   2021-01-21  Released-By: PERLANCAR; Urgency: medium
+
+	- Add subcommands: table-daily-trading-summary,
+	  graph-daily-trading-summary.
+
+        [ux]
+
+	- [subcommand update] Tweak logging statement, so --verbose will show
+          updated data.
+
+        - Tweak graphs (tic label rotation, better colors using
+          ColorTheme::Distinct::WhiteBG)
+
+        - Accept natural dates for --date-* options.
+
+        - Add --week, --month, --3month, --6month, --year, --3year, --5year,
+          --10year shortcuts for --date-start + --date-end.
+
+	- Add example for legend_ownership().
+
+
 0.002   2021-01-19  Released-By: PERLANCAR; Urgency: low
 
 	- No functional changes.
