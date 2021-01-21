@@ -10,6 +10,8 @@ use strict;
 use warnings;
 use Log::ger;
 
+use Data::Clone qw(clone);
+use DateTime;
 use File::chdir;
 
 sub _set_args_default {
@@ -50,6 +52,8 @@ sub _init {
     $App::idxdb::state;
 }
 
+my $today = DateTime->today;
+
 our %SPEC;
 
 $SPEC{':package'} = {
@@ -81,6 +85,40 @@ my %ownership_fields = (
     ForeignTotal => 'Foreign total',
 );
 my @ownership_fields = sort keys %ownership_fields;
+
+my %daily_trading_summary_fields = (
+    'Bid' => {type=>'price'},
+    'BidVolume' => {type=>'volume'},
+    'Change' => {type=>'price'},
+    'Close' => {type=>'price'},
+    'DelistingDate' => {type=>'date'},
+    'FirstTrade' => {type=>'price'},
+    'ForeignBuy' => {type=>'volume'},
+    'ForeignSell' => {type=>'volume'},
+    'ForeignNetBuy' => {type=>'volume'}, # calculated
+    'AccumForeignBuy'    => {type=>'accum_volume'}, # calculated
+    'AccumForeignSell'   => {type=>'accum_volume'}, # calculated
+    'AccumForeignNetBuy' => {type=>'accum_volume'}, # calculated
+    'Frequency' => {type=>'freq'},
+    'High' => {type=>'price'},
+    'IDStockSummary' => {type=>'str'},
+    'IndexIndividual' => {type=>'index'},
+    'ListedShares' => {type=>'num'},
+    'Low' => {type=>'price'},
+    'NonRegularFrequency' => {type=>'freq'},
+    'NonRegularValue' => {type=>'money'},
+    'NonRegularVolume' => {type=>'volume'},
+    'Offer' => {type=>'price'},
+    'OfferVolume' => {type=>'volume'},
+    'OpenPrice' => {type=>'price'},
+    'Previous' => {type=>'price'},
+    'Remarks' => {type=>'str'},
+    'TradebleShares' => {type=>'num'},
+    'Value' => {type=>'money'},
+    'Volume' => {type=>'volume'},
+    'WeightForIndex' => {type=>'num'},
+);
+my @daily_trading_summary_fields = sort keys %daily_trading_summary_fields;
 
 our %args_common = (
     dbpath => {
@@ -118,14 +156,28 @@ our %argsopt_filter_date = (
     date_start => {
         schema => ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural']],
         tags => ['category:filtering'],
+        default => $today->clone->subtract(days=>30)->epoch,
+        cmdline_aliases => {
+            week     => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>  7); $_[0]{date_end} = $today}},
+            month    => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=> 30); $_[0]{date_end} = $today}},
+            '3month' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=> 90); $_[0]{date_end} = $today}},
+            '6month' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>180); $_[0]{date_end} = $today}},
+            # YTD
+            'year'   => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>   365); $_[0]{date_end} = $today}},
+            '3year'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=> 3*365); $_[0]{date_end} = $today}},
+            '5year'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=> 5*365); $_[0]{date_end} = $today}},
+            '10year' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>10*365); $_[0]{date_end} = $today}},
+        },
     },
     date_end => {
         schema => ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural']],
         tags => ['category:filtering'],
+        default => $today->epoch,
     },
 );
 
-my $sch_ownership_field = ['str*'=>{in=>\@ownership_fields, 'x.in.summaries'=>[map {$ownership_fields{$_}} @ownership_fields]}];
+my $sch_ownership_field             = ['str*'=>{in=>\@ownership_fields, 'x.in.summaries'=>[map {$ownership_fields{$_}} @ownership_fields]}];
+my $sch_daily_trading_summary_field = ['str*'=>{in=>\@daily_trading_summary_fields}];
 
 our %argopt_field_ownership = (
     field => {
@@ -139,7 +191,7 @@ our %argopt_fields_ownership = (
     fields => {
         'x.name.is_plural' => 1,
         'x.name.singular' => 'field',
-        schema => ['array*', of=>$sch_ownership_field],
+        schema => ['array*', of=>$sch_ownership_field, 'x.perl.coerce_rules'=>['From_str::comma_sep']],
         tags => ['category:field_selection'],
         default => ['LocalTotal', 'ForeignTotal'],
         cmdline_aliases => {
@@ -149,6 +201,32 @@ our %argopt_fields_ownership = (
         },
     },
 );
+
+our %argopt_field_daily_trading_summary = (
+    field => {
+        schema => $sch_daily_trading_summary_field,
+        tags => ['category:field_selection'],
+        default => 'AccumForeignNetBuy',
+    },
+);
+
+our %argopt_fields_daily_trading_summary = (
+    fields => {
+        'x.name.is_plural' => 1,
+        'x.name.singular' => 'field',
+        schema => ['array*', of=>$sch_daily_trading_summary_field, 'x.perl.coerce_rules'=>['From_str::comma_sep']],
+        tags => ['category:field_selection'],
+        default => ['Volume','Value','ForeignNetBuy'],
+        cmdline_aliases => {
+            fields_all => {is_flag=>1, code=>sub { $_[0]{fields} = \@daily_trading_summary_fields }},
+            #fields_foreign => {is_flag=>1, code=>sub { $_[0]{fields} = [grep {/Foreign/} @ownership_fields] }},
+            #fields_local   => {is_flag=>1, code=>sub { $_[0]{fields} = [grep {/Local/} @ownership_fields] }},
+        },
+    },
+);
+
+our %argopt_fields_daily_trading_summary_for_graph = %{ clone(\%argopt_fields_daily_trading_summary) };
+$argopt_fields_daily_trading_summary_for_graph{fields}{default} = ['AccumForeignNetBuy'];
 
 $SPEC{update} = {
     v => 1.1,
@@ -613,6 +691,154 @@ $SPEC{legend_ownership} = {
 };
 sub legend_ownership {
     [200, "OK", \%ownership_fields];
+}
+
+$SPEC{table_daily_trading_summary} = {
+    v => 1.1,
+    summary => 'Show daily trading summary of some stock',
+    args => {
+        %arg0_stock,
+        %argsopt_filter_date,
+        %argopt_fields_daily_trading_summary,
+        total => {
+            schema => 'bool*',
+        },
+    },
+};
+sub table_daily_trading_summary {
+    my %args = @_;
+    my $stock = $args{stock};
+    my $fields = $args{fields};
+
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
+    my @wheres;
+    my @binds;
+    push @wheres, "StockCode=?";
+    push @binds, $stock;
+    if ($args{date_start}) {
+        push @wheres, "date >= '".$args{date_start}->ymd."'";
+    }
+    if ($args{date_end}) {
+        push @wheres, "date <= '".$args{date_end}->ymd."'";
+    }
+
+    my $sth = $dbh->prepare("SELECT * FROM daily_trading_summary WHERE ".join(" AND ", @wheres)." ORDER BY date");
+    $sth->execute(@binds);
+    my @rows;
+
+    my %total;
+    while (my $row = $sth->fetchrow_hashref) {
+        # calculated fields
+        #use DD; dd \@rows;
+        $row->{ForeignNetBuy}      = $row->{ForeignBuy} - $row->{ForeignSell};
+        $row->{AccumForeignBuy}    = (@rows ? $rows[-1]{AccumForeignBuy}    : 0) + $row->{ForeignBuy}     if grep {$_ eq 'AccumForeignBuy'} @$fields;
+        $row->{AccumForeignSell}   = (@rows ? $rows[-1]{AccumForeignSell}   : 0) + $row->{ForeignSell}    if grep {$_ eq 'AccumForeignSell'} @$fields;
+        $row->{AccumForeignNetBuy} = (@rows ? $rows[-1]{AccumForeignNetBuy} : 0) + $row->{ForeignNetBuy}  if grep {$_ eq 'AccumForeignNetBuy'} @$fields;
+
+        # calculate total
+        if ($args{total}) {
+            for my $f (@daily_trading_summary_fields) {
+                my $spec = $daily_trading_summary_fields{$f};
+                next unless $spec->{type} =~ /^(volume|money|freq)$/;
+                $total{$f} += $row->{$f}  if defined $row->{$f};
+            }
+        }
+
+        delete $row->{StockCode};
+        delete $row->{persen};
+        delete $row->{percentage};
+        delete $row->{ctime};
+        delete $row->{mtime};
+        for my $f (@daily_trading_summary_fields) { delete $row->{$f} unless (grep {$_ eq $f} @$fields) }
+        push @rows, $row;
+    }
+
+    if ($args{total} && @rows) {
+        for my $f (keys %total) {
+            delete $total{$f} unless (grep {$_ eq $f} @$fields);
+        }
+        $total{Date} = 'TOTAL';
+        push @rows, \%total;
+    }
+
+    my @ff  = ('Date', @$fields);
+    my (@ffa, @fffmt);
+    for (@ff) {
+        push @ffa  , (($daily_trading_summary_fields{$_}{type}//'') =~ /^(price|volume|accum_volume|money|freq|num)$/ ? 'right'  : undef);
+        push @fffmt, (($daily_trading_summary_fields{$_}{type}//'') =~ /^(price|volume|accum_volume|money|freq|num)$/ ? 'number' : undef);
+    }
+
+    [200, "OK", \@rows, {
+        'table.fields'       =>\@ff,
+        'table.field_aligns' =>\@ffa,
+        'table.field_formats'=>\@fffmt,
+    }];
+}
+
+$SPEC{graph_daily_trading_summary} = {
+    v => 1.1,
+    summary => 'Show graph from daily trading summary of some stock',
+    args => {
+        %arg0_stock,
+        %argsopt_filter_date,
+        %argopt_fields_daily_trading_summary_for_graph,
+    },
+};
+sub graph_daily_trading_summary {
+    require Chart::Gnuplot;
+    require Color::RGB::Util;
+    require ColorTheme::Distinct::WhiteBG;
+    require File::Temp;
+
+    my %args = @_;
+
+    my $res = table_daily_trading_summary(%args);
+    return $res unless $res->[0] == 200;
+    return [412, "No data"] unless @{ $res->[2] };
+
+    my $mindate = $res->[2][ 0]{Date};
+    my $maxdate = $res->[2][-1]{Date};
+    my @dates = map { $_->{Date} } @{ $res->[2] };
+
+    my ($tempfh, $tempfilename) = File::Temp::tempfile();
+    $tempfilename .= ".png";
+  DRAW_CHART: {
+        my @datasets;
+
+        my $chart = Chart::Gnuplot->new(
+            output   => $tempfilename,
+            title    => join(",", @{ $args{fields} })." of $args{stock} from $mindate to $maxdate",
+            xlabel   => 'date',
+            ylabel   => "",
+            timeaxis => 'x',
+            xtics    => {labelfmt=>'%Y-%m-%d', rotate=>"30 right",
+                     },
+        );
+        my $i = -1;
+
+        my $theme = ColorTheme::Distinct::WhiteBG->new;
+        my @colors = map { '#'.$theme->get_item_color($_) } ($theme->list_items);
+
+        for my $field (@{ $args{fields} }) {
+            $i++;
+            push @datasets, Chart::Gnuplot::DataSet->new(
+                xdata   => \@dates,
+                ydata   => [map { $_->{$field} } @{ $res->[2] }],
+                timefmt => '%Y-%m-%d',
+                title   => $field,
+                color   => $colors[$i],
+                style   => 'lines',
+            );
+        }
+        $chart->plot2d(@datasets);
+    }
+
+    require Browser::Open;
+    Browser::Open::open_browser("file:$tempfilename");
+
+    [200];
 }
 
 1;
