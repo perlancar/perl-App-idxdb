@@ -1,3 +1,24 @@
+0.004   2021-01-22  Released-By: PERLANCAR; Urgency: medium
+
+	[incompatible changes]
+
+        - [reorganize] Reorganize the various *ownership* and *daily*
+	  subcommands to ownership & daily. This means merging the graph-* and
+	  table-* subcommands. User can now produce graphs by specifying
+	  --graph.
+
+        - [reorganize] Merge ownership-legends subcommand to ownership.
+
+        [Enhancements]
+
+        - [subcommand daily] Accept multiple stocks.
+
+        [ux]
+
+	- Add alias --1week for --week, --1month for --month, --1year for
+	  --year; add period shortcut --ytd.
+
+
 0.003   2021-01-21  Released-By: PERLANCAR; Urgency: medium
 
 	- Add subcommands: table-daily-trading-summary,
