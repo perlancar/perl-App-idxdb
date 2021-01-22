@@ -18,15 +18,9 @@ my $prefix = '/App/idxdb/';
 Perinci::CmdLine::Any->new(
     url => $prefix,
     subcommands => {
-        'update'           => {url => "${prefix}update"},
-
-        'legend-ownership' => {url => "${prefix}legend_ownership"},
-        'table-ownership'  => {url => "${prefix}table_ownership"},
-        'graph-ownership'  => {url => "${prefix}graph_ownership"},
-        'graph-ownership-composition' => {url => "${prefix}graph_ownership_composition"},
-
-        'table-daily-trading-summary' => {url => "${prefix}table_daily_trading_summary"},
-        'graph-daily-trading-summary' => {url => "${prefix}graph_daily_trading_summary"},
+        'update'     => {url => "${prefix}update"},
+        'ownership'  => {url => "${prefix}ownership"},
+        'daily'      => {url => "${prefix}daily"},
     },
     log => 1,
 )->run;
@@ -42,16 +36,13 @@ To update data:
 
 To see the legends for ownership field names (e.g. ForeignIB = foreign bank):
 
- % idxdb legend-ownership
+ % idxdb ownership --legend
 
-To see a table of ownership (% foreign/local) of some stock through time:
+To see ownership (e.g. % foreign/local) of some stock through time:
 
- % idxdb table-ownership BBRI
- % idxdb table-ownership BBRI --fields-all
-
-To graph ownership (by default foreign) of some stock:
-
- % idxdb graph-ownership BBRI
+ % idxdb ownership BBRI
+ % idxdb ownership --fields-all BBRI --date-start 2020-01-01 --date-end 2020-09-30
+ % idxdb ownership --fields-foreign-total --6month --graph BBNI
 
 To graph ownership composition (% foreign bank, foreign total, local bank, etc)
 of some stock:
