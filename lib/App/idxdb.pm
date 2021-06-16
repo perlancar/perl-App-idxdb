@@ -11,8 +11,9 @@ use warnings;
 use Log::ger;
 
 #use Data::Clone qw(clone);
-use DateTime;
+use DateTime; # TODO: defer this, too heavy for tab completion
 use File::chdir;
+#use List::Util qw(min max);
 
 sub _set_args_default {
     my $args = shift;
@@ -652,10 +653,17 @@ sub daily {
             output   => $tempfilename,
             title    => join(",", @$fields)." of ".join(",",@$stocks)." from $mindate to $maxdate",
             xlabel   => 'date',
-            ylabel   => "\%",
+            ylabel   => $fields->[0],
+            (@$fields > 1 ? (y2label  =>
+                                 $fields->[1] .
+                                 (@$fields > 2 ? ", $fields->[2]" : "") .
+                                 (@$fields > 3 ? ", ...":"")) : ()),
             timeaxis => 'x',
             xtics    => {labelfmt=>'%Y-%m-%d', rotate=>"30 right"},
-            #yrange   => [0, 100],
+            #yrange   => [0, 5000],
+            #y2range  => [-0, 1000_000_000],
+            ytics    => {mirror=>'off'}, # no effect?
+            y2tics   => {mirror=>'off'}, # no effect?
         );
         my $i = -1;
         my @datasets;
@@ -671,6 +679,7 @@ sub daily {
                     title   => "$stock.$field",
                     color   => $colors[$i],
                     style   => 'lines',
+                    ($i ? (axes => "x1y2") : ()),
                 );
             }
         }
