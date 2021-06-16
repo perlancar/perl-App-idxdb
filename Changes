@@ -1,3 +1,13 @@
+0.005   2021-06-16  Released-By: PERLANCAR; Urgency: medium
+
+	- [ux] [subcommand daily] Use secondary y axes for fields 2, 3, ...
+	  so we can plot different scales e.g. closing price (3000-5000) vs
+	  accumulated net buys (range millions - billions) in the same
+	  graph.
+
+	- [ux] Add options --2month, --2year.
+
+
 0.004   2021-01-22  Released-By: PERLANCAR; Urgency: medium
 
 	[Incompatible changes]
