@@ -225,9 +225,10 @@ our %argopt_fields_daily = (
         tags => ['category:field_selection'],
         default => ['Volume','Value','ForeignNetBuy'],
         cmdline_aliases => {
-            fields_all         => {is_flag=>1, code=>sub { $_[0]{fields} = \@daily_fields }},
-            fields_price       => {is_flag=>1, code=>sub { $_[0]{fields} = [qw/FirstTrade OpenPrice High Low Close/] }},
-            fields_price_close => {is_flag=>1, code=>sub { $_[0]{fields} = [qw/Close/] }},
+            fields_all            => {is_flag=>1, summary=>'Display all fields', code=>sub { $_[0]{fields} = \@daily_fields }},
+            fields_price_all      => {is_flag=>1, summary=>'Display all prices', code=>sub { $_[0]{fields} = [qw/FirstTrade OpenPrice High Low Close/] }},
+            fields_price_close    => {is_flag=>1, summary=>'Short for --field Close', code=>sub { $_[0]{fields} = [qw/Close/] }},
+            fields_price_and_afnb => {is_flag=>1, summary=>'Short for --field Close --field AccumForeignNetBuy', code=>sub { $_[0]{fields} = [qw/Close AccumForeignNetBuy/] }},
         },
     },
 );
