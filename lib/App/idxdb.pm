@@ -240,6 +240,7 @@ our %argopt_graph = (
         summary => 'Show graph instead of table',
         schema => 'bool*',
         tags => ['category:action'],
+        cmdline_aliases => {g=>{}},
     },
 );
 
