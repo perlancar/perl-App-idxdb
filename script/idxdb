@@ -49,15 +49,15 @@ To see ownership (e.g. % foreign/local) of some stock through time:
 To graph ownership composition (% foreign bank, foreign total, local bank, etc)
 of some stock:
 
- % idxdb graph-ownership-composition BBRI
+ % idxdb ownership BBRI --graph
 
 To see a table of daily trading summary of some stock:
 
- % idxdb table-daily-trading-summary BBRI
+ % idxdb daily BBRI
 
-To graph accumulated foreign net buy of some stock in the last year:
+To graph closing price and accumulated foreign net buy of some stock in the last 2 year:
 
- % idxdb graph-daily-trading-summary --field AccumForeignNetBuy --year BBRI
+ % idxdb daily --field Close --field AccumForeignNetBuy --2year BBRI
 
 
 =head1 DESCRIPTION
