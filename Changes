@@ -1,3 +1,14 @@
+0.006   2021-06-17  Released-By: PERLANCAR; Urgency: medium
+
+	- Add subcommand: stocks-by-foreign-ownership.
+
+	- [ux] Replace usage of DateTime outside of functions with
+	  Time::Local::More, to reduce startup overhead for tab completion.
+
+	- [ux] [subcommand daily] Add option --fields-price-and-afnb (Close
+	  and AccumForeignNetBuy).
+
+
 0.005   2021-06-16  Released-By: PERLANCAR; Urgency: medium
 
 	- [ux] [subcommand daily] Use secondary y axes for fields 2, 3, ...
