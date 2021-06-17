@@ -739,6 +739,42 @@ sub daily {
     }];
 }
 
+$SPEC{stocks_by_foreign_ownership} = {
+    v => 1.1,
+    summary => 'Rank stocks from highest foreign ownership',
+    args => {
+        %args_common,
+        # XXX date?
+    },
+};
+sub stocks_by_foreign_ownership {
+    my %args = @_;
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
+    my $sth = $dbh->prepare("
+SELECT
+  Code,
+  -- ForeignTotal,
+  -- LocalTotal,
+  ForeignTotal*100.0/(ForeignTotal+LocalTotal) AS PctForeignTotal
+FROM stock_ownership
+WHERE
+  (ForeignTotal+LocalTotal)>0 AND
+  date=(SELECT MAX(date) FROM stock_ownership)
+ORDER BY PctForeignTotal DESC,Code ASC");
+    $sth->execute;
+
+    my @rows;
+    while (my $row = $sth->fetchrow_hashref) {
+        $row->{PctForeignTotal} = sprintf "%.02f", $row->{PctForeignTotal};
+        push @rows, $row;
+    }
+
+    my $resmeta = {'table.fields' => [qw/Code ForeignTotal/]};
+    [200, "OK", \@rows, $resmeta];
+}
+
 1;
 # ABSTRACT:
 
