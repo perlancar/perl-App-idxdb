@@ -11,9 +11,13 @@ use warnings;
 use Log::ger;
 
 #use Data::Clone qw(clone);
-use DateTime; # TODO: defer this, too heavy for tab completion
 use File::chdir;
 #use List::Util qw(min max);
+use Time::Local::More qw(time_startofday_local time_startofyear_local);
+
+my $now = time();
+my $today = time_startofday_local($now);
+my $startofyear = time_startofyear_local($now);
 
 sub _set_args_default {
     my $args = shift;
@@ -52,8 +56,6 @@ sub _init {
     }
     $App::idxdb::state;
 }
-
-my $today = DateTime->today;
 
 our %SPEC;
 
@@ -157,28 +159,28 @@ our %argsopt_filter_date = (
     date_start => {
         schema => ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural']],
         tags => ['category:filtering'],
-        default => $today->clone->subtract(days=>30)->epoch,
+        default => ($today - 30*86400),
         cmdline_aliases => {
-            'week'   => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>     7); $_[0]{date_end} = $today}},
-            '1week'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>     7); $_[0]{date_end} = $today}},
-            'month'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>    30); $_[0]{date_end} = $today}},
-            '1month' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>    30); $_[0]{date_end} = $today}},
-            '2month' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>    60); $_[0]{date_end} = $today}},
-            '3month' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>    90); $_[0]{date_end} = $today}},
-            '6month' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>   180); $_[0]{date_end} = $today}},
-            'ytd'    => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->set(month=>1, day=>1);  $_[0]{date_end} = $today}},
-            'year'   => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>   365); $_[0]{date_end} = $today}},
-            '1year'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>   365); $_[0]{date_end} = $today}},
-            '2year'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=> 2*365); $_[0]{date_end} = $today}},
-            '3year'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=> 3*365); $_[0]{date_end} = $today}},
-            '5year'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=> 5*365); $_[0]{date_end} = $today}},
-            '10year' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today->clone->subtract(days=>10*365); $_[0]{date_end} = $today}},
+            'week'   => {is_flag=>1, code=>sub {$_[0]{date_start} = $today-     7*86400; $_[0]{date_end} = $today}},
+            '1week'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today-     7*86400; $_[0]{date_end} = $today}},
+            'month'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today-    30*86400; $_[0]{date_end} = $today}},
+            '1month' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today-    30*86400; $_[0]{date_end} = $today}},
+            '2month' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today-    60*86400; $_[0]{date_end} = $today}},
+            '3month' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today-    90*86400; $_[0]{date_end} = $today}},
+            '6month' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today-   180*86400; $_[0]{date_end} = $today}},
+            'ytd'    => {is_flag=>1, code=>sub {$_[0]{date_start} = $startofyear;        $_[0]{date_end} = $today}},
+            'year'   => {is_flag=>1, code=>sub {$_[0]{date_start} = $today-   365*86400; $_[0]{date_end} = $today}},
+            '1year'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today-   365*86400; $_[0]{date_end} = $today}},
+            '2year'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today- 2*365*86400; $_[0]{date_end} = $today}},
+            '3year'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today- 3*365*86400; $_[0]{date_end} = $today}},
+            '5year'  => {is_flag=>1, code=>sub {$_[0]{date_start} = $today- 5*365*86400; $_[0]{date_end} = $today}},
+            '10year' => {is_flag=>1, code=>sub {$_[0]{date_start} = $today-10*365*86400; $_[0]{date_end} = $today}},
         },
     },
     date_end => {
         schema => ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural']],
         tags => ['category:filtering'],
-        default => $today->epoch,
+        default => $today,
     },
 );
 
