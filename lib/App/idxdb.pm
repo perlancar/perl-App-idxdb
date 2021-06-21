@@ -325,7 +325,7 @@ sub update {
         }
         local $CWD = "$gd_path/table/idx_daily_trading_summary/raw";
       YEAR:
-        for my $year (reverse glob("*")) {
+        for my $year (reverse grep {-d} glob("*")) {
             local $CWD = $year;
           FILENAME:
             for my $filename (reverse glob("*.json.gz")) {
