@@ -18,6 +18,7 @@ my $prefix = '/App/idxdb/';
 Perinci::CmdLine::Any->new(
     url => $prefix,
     subcommands => {
+        'stats'      => {url => "${prefix}stats"},
         'update'     => {url => "${prefix}update"},
         'ownership'  => {url => "${prefix}ownership"},
         'daily'      => {url => "${prefix}daily"},

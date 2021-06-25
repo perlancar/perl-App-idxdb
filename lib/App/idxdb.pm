@@ -244,6 +244,46 @@ our %argopt_graph = (
     },
 );
 
+$SPEC{stats} = {
+    v => 1.1,
+    summary => 'Show database stats',
+    args => {
+        %args_common,
+    },
+};
+sub stats {
+    #require DateTime;
+    #require Time::Local::More;
+
+    my %args = @_;
+
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
+    my %stats;
+
+    {
+        my ($min, $max) = $dbh->selectrow_array("SELECT MIN(Date), MAX(Date) FROM daily_trading_summary");
+        $stats{daily_data_earliest_date} = $min;
+        $stats{daily_data_latest_date}   = $max;
+    }
+
+    {
+        my ($n) = $dbh->selectrow_array("SELECT COUNT(DISTINCT Date) FROM daily_trading_summary");
+        $stats{daily_data_num_days} = $n;
+    }
+
+    {
+        my $n;
+        ($n) = $dbh->selectrow_array("SELECT COUNT(*) FROM daily_trading_summary WHERE Date=(SELECT MIN(Date) FROM daily_trading_summary)");
+        $stats{daily_data_earliest_num_securities} = $n;
+        ($n) = $dbh->selectrow_array("SELECT COUNT(*) FROM daily_trading_summary WHERE Date=(SELECT MAX(Date) FROM daily_trading_summary)");
+        $stats{daily_data_latest_num_securities} = $n;
+    }
+
+    [200, "OK", \%stats];
+}
+
 $SPEC{update} = {
     v => 1.1,
     summary => 'Update data',
