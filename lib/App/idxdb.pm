@@ -10,7 +10,7 @@ use strict;
 use warnings;
 use Log::ger;
 
-#use Data::Clone qw(clone);
+use Clone::Util qw(modclone);
 use File::chdir;
 #use List::Util qw(min max);
 use Time::Local::More qw(time_startofday_local time_startofyear_local);
@@ -57,7 +57,38 @@ sub _init {
     $App::idxdb::state;
 }
 
+# if the requested date_end does not have trading data, move back N day(s) until
+# we have trading data. likewise for date_start (move it back for N days first,
+# then move it back again M day(s) if that date does not have trading.
+sub _find_dates_with_trading {
+    require DateTime;
+
+    my ($state, $args) = @_;
+
+    my $dbh = $state->{dbh};
+    my $delta = $args->{date_end} - $args->{date_start};
+
+    my $date_end_ymd;
+    {
+        $date_end_ymd = DateTime->from_epoch(epoch => $args->{date_end})->ymd;
+        my ($date_start_ymd_with_trading) = $dbh->selectrow_array(
+            "SELECT MAX(Date) FROM daily_trading_summary WHERE Date <= '$date_end_ymd'");
+        unless (defined $date_end_ymd_with_trading) {
+            die "Can't find trading dates that are <= $date_end_ymd";
+        }
+    }
+
+    my $date_start_ymd;
+    {
+        my $n = ;
+
+    }
+
+}
+
 our %SPEC;
+
+my $sch_date = ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural']];
 
 $SPEC{':package'} = {
     v => 1.1,
@@ -157,7 +188,7 @@ our %arg0_stocks = (
 
 our %argsopt_filter_date = (
     date_start => {
-        schema => ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural']],
+        schema => $sch_date,
         tags => ['category:filtering'],
         default => ($today - 30*86400),
         cmdline_aliases => {
@@ -178,9 +209,15 @@ our %argsopt_filter_date = (
         },
     },
     date_end => {
-        schema => ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural']],
+        schema => $sch_date,
         tags => ['category:filtering'],
         default => $today,
+    },
+);
+
+our %argopt_date = (
+    date => {
+        schema => $sch_date,
     },
 );
 
@@ -778,6 +815,57 @@ sub daily {
         'table.field_aligns' =>\@ffa,
         'table.field_formats'=>\@fffmt,
     }];
+}
+
+$SPEC{stocks_by_gain} = {
+    v => 1.1,
+    summary => 'Rank stocks from highest gain percentage',
+    description => <<'_',
+
+The default is the use the latest date compared to the previous trading day. If
+you use the `--date-end` option you can select a specific date instead of the
+latest date. If you use the `--date-start` option or the various period options
+like `--month` or `--2year` you can select a period instead of the default
+`1day`.
+
+_
+    args => {
+        %args_common,
+        %{
+            modclone {
+                $_->{date_start}{default} = $today-86400;
+            } \%argsopt_filter_date,
+        },
+    },
+};
+sub stocks_by_gain {
+    my %args = @_;
+    my $state = _init(\%args, 'ro');
+    my $dbh = $state->{dbh};
+
+    _find_dates_with_trading($state, \%args);
+
+    my $sth = $dbh->prepare("
+SELECT
+  Code,
+  -- ForeignTotal,
+  -- LocalTotal,
+  ForeignTotal*100.0/(ForeignTotal+LocalTotal) AS PctForeignTotal
+FROM stock_ownership
+WHERE
+  (ForeignTotal+LocalTotal)>0 AND
+  date=(SELECT MAX(date) FROM stock_ownership)
+ORDER BY PctForeignTotal DESC,Code ASC");
+    $sth->execute;
+
+    my @rows;
+    while (my $row = $sth->fetchrow_hashref) {
+        $row->{PctForeignTotal} = sprintf "%.02f", $row->{PctForeignTotal};
+        push @rows, $row;
+    }
+
+    my $resmeta = {'table.fields' => [qw/Code ForeignTotal/]};
+    [200, "OK", \@rows, $resmeta];
 }
 
 $SPEC{stocks_by_foreign_ownership} = {
