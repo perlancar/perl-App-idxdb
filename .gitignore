@@ -2,3 +2,4 @@ App-idxdb-*
 .build
 *~
 nytprof*
+.DS_Store
