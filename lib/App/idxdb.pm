@@ -73,15 +73,14 @@ sub _find_dates_with_trading {
         $date_end_ymd = DateTime->from_epoch(epoch => $args->{date_end})->ymd;
         my ($date_start_ymd_with_trading) = $dbh->selectrow_array(
             "SELECT MAX(Date) FROM daily_trading_summary WHERE Date <= '$date_end_ymd'");
-        unless (defined $date_end_ymd_with_trading) {
+        unless (defined $date_start_ymd_with_trading) {
             die "Can't find trading dates that are <= $date_end_ymd";
         }
     }
 
     my $date_start_ymd;
     {
-        my $n = ;
-
+        my $n = 0;
     }
 
 }
@@ -831,11 +830,11 @@ like `--month` or `--2year` you can select a period instead of the default
 _
     args => {
         %args_common,
-        %{
+        %{(
             modclone {
                 $_->{date_start}{default} = $today-86400;
             } \%argsopt_filter_date,
-        },
+        )},
     },
 };
 sub stocks_by_gain {
