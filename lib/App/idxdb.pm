@@ -117,7 +117,7 @@ sub _find_dates_with_trading {
 
 our %SPEC;
 
-my $sch_date = ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural_jakarta']];
+my $sch_date = ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['!From_float::epoch', 'From_float::epoch_jakarta', 'From_str::natural_jakarta']];
 
 $SPEC{':package'} = {
     v => 1.1,
