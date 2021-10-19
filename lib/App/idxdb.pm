@@ -19,6 +19,29 @@ my $now = time();
 my $today = time_startofday_local($now);
 my $startofyear = time_startofyear_local($now);
 
+our $db_schema_spec = {
+    latest_v => 1,
+    install => [
+        'CREATE TABLE trade (
+             user TEXT NOT NULL,
+             date TEXT NOT NULL,              -- use iso format
+             stock_code TEXT NOT NULL,
+             price DECIMAL NOT NULL,          -- price per share
+             price_cur_unit DECIMAL NOT NULL, -- price per share, with all stock split/reverse split applied
+             fee DECIMAL NOT NULL DEFAULT 0,  -- fee per share, set to 0 if price is already clean/avg
+             tax DECIMAL NOT NULL DEFAULT 0,  -- fee per share, set to 0 if price is already clean/avg
+             num_shares INT NOT NULL
+         )',
+        'CREATE TABLE portfolio (
+             user TEXT NOT NULL,
+             stock_code TEXT NOT NULL,
+             avg_price_cur_unit DECIMAL NOT NULL, -- average price, with all stock split/reverse split applied
+             num_shares INT NOT NULL
+         )',
+        'CREATE UNIQUE INDEX portfolio__user_stock_code ON portfolio(user, stock_code)',
+    ],
+};
+
 sub _set_args_default {
     my $args = shift;
     if (!$args->{dbpath}) {
@@ -29,6 +52,7 @@ sub _set_args_default {
 
 sub _connect_db {
     require DBI;
+    require SQL::Schema::Versioned;
 
     my ($dbpath, $mode) = @_;
 
@@ -39,8 +63,14 @@ sub _connect_db {
             "Or maybe you should run the 'update' subcommand first to create the database.\n" unless -f $dbpath;
     }
     log_trace("Connecting to SQLite database at %s ...", $dbpath);
-    DBI->connect("dbi:SQLite:database=$dbpath", undef, undef,
-                 {RaiseError=>1});
+    my $dbh = DBI->connect("dbi:SQLite:database=$dbpath", undef, undef,
+                           {RaiseError=>1});
+
+    my $res = SQL::Schema::Versioned::create_or_update_db_schema(
+        dbh => $dbh, spec => $db_schema_spec);
+    die "Can't create/update schema: $res->[0] - $res->[1]\n"
+        unless $res->[0] == 200;
+    $dbh;
 }
 
 sub _init {
@@ -73,22 +103,21 @@ sub _find_dates_with_trading {
         $date_end_ymd = DateTime->from_epoch(epoch => $args->{date_end})->ymd;
         my ($date_start_ymd_with_trading) = $dbh->selectrow_array(
             "SELECT MAX(Date) FROM daily_trading_summary WHERE Date <= '$date_end_ymd'");
-        unless (defined $date_end_ymd_with_trading) {
+        unless (defined $date_start_ymd_with_trading) {
             die "Can't find trading dates that are <= $date_end_ymd";
         }
     }
 
     my $date_start_ymd;
     {
-        my $n = ;
-
+        my $n = 0;
     }
 
 }
 
 our %SPEC;
 
-my $sch_date = ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['From_str::natural_jakarta']];
+my $sch_date = ['date*', 'x.perl.coerce_to' => 'DateTime', 'x.perl.coerce_rules'=>['!From_float::epoch', 'From_float::epoch_jakarta', 'From_str::natural_jakarta']];
 
 $SPEC{':package'} = {
     v => 1.1,
@@ -358,7 +387,7 @@ sub update {
         last if $table_exists;
         log_info "Creating meta table ...";
         $dbh->do("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT)");
-    }
+    } # UPDAtE_META
 
     my $sth_sel_meta = $dbh->prepare("SELECT value FROM meta WHERE name=?");
     my $sth_upd_meta = $dbh->prepare("INSERT OR REPLACE INTO meta (name,value) VALUES (?,?)");
@@ -390,7 +419,7 @@ sub update {
             $sth_upd_meta->execute("stock_table_mtime", time());
             $dbh->commit;
         }
-    }
+    } # UPDATE_STOCK
 
   UPDATE_DAILY_TRADING_SUMMARY:
     {
@@ -537,7 +566,7 @@ sub update {
                 $dbh->commit;
             }
         }
-    } # UPDATE_DAILY_TRADING_SUMMARY
+    } # UPDATE_OWNERSHIP
 
     [200];
 }
@@ -831,11 +860,11 @@ like `--month` or `--2year` you can select a period instead of the default
 _
     args => {
         %args_common,
-        %{
+        %{(
             modclone {
                 $_->{date_start}{default} = $today-86400;
             } \%argsopt_filter_date,
-        },
+        )},
     },
 };
 sub stocks_by_gain {
