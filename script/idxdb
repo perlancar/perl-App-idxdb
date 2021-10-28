@@ -21,6 +21,7 @@ Perinci::CmdLine::Any->new(
         'stats'      => {url => "${prefix}stats"},
         'update'     => {url => "${prefix}update"},
         'ownership'  => {url => "${prefix}ownership"},
+        'ownership-legends'  => {url => "${prefix}ownership_legends"},
         'daily'      => {url => "${prefix}daily"},
         #'stocks-by-ownership' => {url => "${prefix}stock_by_ownership"},
         'stocks-by-foreign-ownership' => {url => "${prefix}stocks_by_foreign_ownership"},
