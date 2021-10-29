@@ -594,6 +594,12 @@ $SPEC{ownership} = {
     examples => [
         {
             summary => 'Show legends instead (e.g. ForeignIB = foreign bank, etc)',
+            description => <<'_',
+
+Note that there is also `ownership-legends` subcommand which does the same
+thing.
+
+_
             args => {legend=>1},
             test => 0,
         },
@@ -683,6 +689,29 @@ sub ownership {
     }
 
     [200, "OK", \@rows, {'table.fields'=>['date']}];
+}
+
+$SPEC{ownership_legends} = {
+    v => 1.1,
+    summary => 'Show legends stock ownership fields',
+    description => <<'_',
+
+Note that there is also the `--legend` option in the `ownership` subcommand
+which does the same thing.
+
+_
+    args => {
+    },
+    examples => [
+        {
+            summary => 'Show legends',
+            argss => {},
+            test => 0,
+        },
+    ],
+};
+sub ownership_legends {
+    return [200, "OK", \%ownership_fields];
 }
 
 $SPEC{daily} = {
